@@ -1,24 +1,79 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" >
 <head>
-<meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>Drink Recipe Quiz</title>
-<style>
-  body { font-family: Arial, sans-serif; max-width: 600px; margin: 20px auto; padding: 10px; }
-  label, input, button { display: block; margin-top: 10px; }
-  #result { margin-top: 20px; font-weight: bold; }
-</style>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Drink Recipe Quiz - Click Ingredients</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      max-width: 700px;
+      margin: 20px auto;
+      padding: 10px;
+    }
+    h1 {
+      text-align: center;
+    }
+    #ingredients-list {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin: 10px 0;
+    }
+    .ingredient-btn {
+      padding: 6px 12px;
+      border: 1.5px solid #444;
+      border-radius: 16px;
+      background: #eee;
+      cursor: pointer;
+      user-select: none;
+      transition: background-color 0.3s, border-color 0.3s;
+    }
+    .ingredient-btn.selected {
+      background-color: #4caf50;
+      color: white;
+      border-color: #4caf50;
+    }
+    #cup {
+      border: 2px dashed #666;
+      min-height: 50px;
+      padding: 8px;
+      margin: 12px 0;
+      border-radius: 8px;
+      background-color: #f9f9f9;
+    }
+    #cup strong {
+      display: block;
+      margin-bottom: 6px;
+    }
+    #result {
+      margin-top: 16px;
+      font-weight: bold;
+      min-height: 24px;
+    }
+    #score {
+      margin-top: 12px;
+      font-size: 1.1em;
+    }
+    #submit-btn {
+      padding: 8px 18px;
+      font-size: 1em;
+      margin-top: 8px;
+      cursor: pointer;
+    }
+  </style>
 </head>
 <body>
 
 <h1>Drink Recipe Quiz</h1>
-<p>Type the components separated by commas.</p>
+<p>Click on the ingredients that belong to the drink.</p>
 
-<div id="quiz-container">
+<div>
   <p><strong id="drink-name"></strong></p>
-  <label for="components-input">Enter the components:</label>
-  <input type="text" id="components-input" autocomplete="off" />
+  <div id="ingredients-list"></div>
+
+  <div id="cup"><strong>Selected Ingredients:</strong><div id="selected-ingredients"></div></div>
+
   <button id="submit-btn">Submit</button>
   <div id="result"></div>
   <div id="score"></div>
@@ -47,18 +102,51 @@ const recipes = {
   "Iced Black Coffee": ["150 Hot Coffee", "inc S", "250 Cold Coffee"]
 };
 
+// Flatten all unique ingredients
+const allIngredients = Array.from(
+  new Set(
+    Object.values(recipes).flat()
+  )
+).sort();
+
 const drinks = Object.keys(recipes);
 const rounds = 5;
 
 let currentRound = 0;
 let score = 0;
 let currentDrink = null;
+let selectedIngredients = new Set();
 
 const drinkNameEl = document.getElementById("drink-name");
-const componentsInput = document.getElementById("components-input");
+const ingredientsListEl = document.getElementById("ingredients-list");
+const selectedIngredientsEl = document.getElementById("selected-ingredients");
 const submitBtn = document.getElementById("submit-btn");
 const resultEl = document.getElementById("result");
 const scoreEl = document.getElementById("score");
+
+function renderIngredients() {
+  ingredientsListEl.innerHTML = "";
+  allIngredients.forEach(ingredient => {
+    const btn = document.createElement("button");
+    btn.textContent = ingredient;
+    btn.className = "ingredient-btn";
+    btn.addEventListener("click", () => {
+      if (selectedIngredients.has(ingredient)) {
+        selectedIngredients.delete(ingredient);
+        btn.classList.remove("selected");
+      } else {
+        selectedIngredients.add(ingredient);
+        btn.classList.add("selected");
+      }
+      updateCup();
+    });
+    ingredientsListEl.appendChild(btn);
+  });
+}
+
+function updateCup() {
+  selectedIngredientsEl.textContent = [...selectedIngredients].join(", ") || "(none)";
+}
 
 function normalizeList(list) {
   return list.map(s => s.trim().toLowerCase()).sort();
@@ -68,32 +156,41 @@ function startGame() {
   currentRound = 0;
   score = 0;
   scoreEl.textContent = `Score: ${score} / ${rounds}`;
+  resultEl.textContent = "";
+  componentsReset();
   nextQuestion();
+}
+
+function componentsReset() {
+  selectedIngredients.clear();
+  updateCup();
+  // Reset all buttons
+  document.querySelectorAll(".ingredient-btn").forEach(btn => btn.classList.remove("selected"));
 }
 
 function nextQuestion() {
   if (currentRound >= rounds) {
     drinkNameEl.textContent = "Game over!";
-    componentsInput.style.display = "none";
-    submitBtn.style.display = "none";
+    submitBtn.disabled = true;
     resultEl.textContent = `Your final score: ${score} / ${rounds}`;
     return;
   }
   currentDrink = drinks[Math.floor(Math.random() * drinks.length)];
   drinkNameEl.textContent = `Drink: ${currentDrink}`;
-  componentsInput.value = "";
-  componentsInput.focus();
-  resultEl.textContent = "";
   currentRound++;
+  componentsReset();
+  resultEl.textContent = "";
 }
 
 submitBtn.addEventListener("click", () => {
-  const userAnswer = componentsInput.value.split(",").map(s => s.trim().toLowerCase()).filter(Boolean);
+  if (selectedIngredients.size === 0) {
+    resultEl.textContent = "Please select at least one ingredient.";
+    return;
+  }
+  const userAnswer = normalizeList([...selectedIngredients]);
   const correctAnswer = normalizeList(recipes[currentDrink]);
-  
-  const userSorted = userAnswer.sort();
-  
-  if (JSON.stringify(userSorted) === JSON.stringify(correctAnswer)) {
+
+  if (JSON.stringify(userAnswer) === JSON.stringify(correctAnswer)) {
     resultEl.textContent = "✅ Correct!";
     score++;
   } else {
@@ -101,9 +198,10 @@ submitBtn.addEventListener("click", () => {
   }
   scoreEl.textContent = `Score: ${score} / ${rounds}`;
 
-  setTimeout(nextQuestion, 2000);
+  setTimeout(nextQuestion, 2500);
 });
 
+renderIngredients();
 startGame();
 </script>
 
